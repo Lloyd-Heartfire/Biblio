@@ -1,5 +1,4 @@
-# API de gestion de bibliotheque 
-
+# 📚 Gestion de Bibliothèque – FastAPI TP1
 Ce projet est une application de gestion de bibliothèque universitaire basée sur **FastAPI**, structurée selon une architecture **N-Tiers**. Elle expose une API RESTful organisée pour gérer les livres, les utilisateurs et les emprunts.
   
 ## Exercice 1 : Définition des schémas Pydantic  
@@ -252,3 +251,207 @@ Exemples d’URL disponibles :
 - `/api/v1/books/`
 - `/api/v1/users/`
 - `/api/v1/auth/login`
+
+___
+# 📚 Gestion de Bibliothèque – FastAPI TP3
+
+
+
+## 🔒 Exercice 7 : Mise à jour de la route d’authentification
+
+### 📁 Fichier : `src/api/routes/auth.py`
+
+Nous mettons en place un système d’authentification avec `OAuth2PasswordRequestForm`, en utilisant la couche métier `UserService`.
+
+### 🧹 Code :
+
+```python
+@router.post("/login", response_model=Token)
+def login_access_token(
+    db: Session = Depends(get_db),
+    form_data: OAuth2PasswordRequestForm = Depends()
+):
+    repository = UserRepository(UserModel, db)
+    service = UserService(repository)
+
+    user = service.authenticate(email=form_data.username, password=form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email ou mot de passe incorrect",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not service.is_active(user=user):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Utilisateur inactif",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    return {
+        "access_token": create_access_token(
+            subject=user.id, expires_delta=access_token_expires
+        ),
+        "token_type": "bearer",
+    }
+```
+
+---
+
+## 🧪 Exercice 8 : Tests unitaires – Couche métier utilisateur
+
+### 📁 Fichier : `tests/conftest.py`
+
+Mise en place d’une base SQLite en mémoire pour les tests automatisés :
+
+```python
+@pytest.fixture(scope="session")
+def engine():
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    return engine
+```
+
+Client de test FastAPI :
+
+```python
+@pytest.fixture(scope="function")
+def client(db_session):
+    def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    from fastapi.testclient import TestClient
+    with TestClient(app) as client:
+        yield client
+    app.dependency_overrides = {}
+```
+
+### 📁 Fichier : `tests/services/test_users.py`
+
+#### ✅ Exemple de test : création d’un utilisateur
+
+```python
+def test_create_user(db_session: Session):
+    repository = UserRepository(User, db_session)
+    service = UserService(repository)
+
+    user_in = UserCreate(
+        email="test@example.com",
+        password="password123",
+        full_name="Test User"
+    )
+
+    user = service.create(obj_in=user_in)
+
+    assert user.email == "test@example.com"
+    assert hasattr(user, "hashed_password")
+    assert user.hashed_password != "password123"
+```
+
+#### 🔐 Exemple : authentification
+
+```python
+def test_authenticate_user(db_session: Session):
+    user_in = UserCreate(
+        email="auth@example.com",
+        password="password123",
+        full_name="Auth User"
+    )
+
+    user = service.create(obj_in=user_in)
+    authenticated_user = service.authenticate(email="auth@example.com", password="password123")
+
+    assert authenticated_user.id == user.id
+```
+
+#### 🔄 Exemple : mise à jour
+
+```python
+def test_update_user(db_session: Session):
+    user = service.create(obj_in=UserCreate(...))
+    update = UserUpdate(full_name="New Name")
+
+    updated_user = service.update(db_obj=user, obj_in=update)
+
+    assert updated_user.full_name == "New Name"
+```
+
+---
+
+## 📊 Exercice 9 : Service de Statistiques
+
+### 📁 Fichier : `src/services/stats.py`
+
+Un service pour calculer des statistiques globales et détaillées sur les livres, utilisateurs et emprunts.
+
+#### 📈 Statistiques générales
+
+```python
+def get_general_stats(self) -> Dict[str, Any]:
+    return {
+        "total_books": self.db.query(func.sum(Book.quantity)).scalar() or 0,
+        "unique_books": self.db.query(func.count(Book.id)).scalar() or 0,
+        ...
+    }
+```
+
+#### 📚 Livres les plus empruntés
+
+```python
+def get_most_borrowed_books(self, limit: int = 10) -> List[Dict[str, Any]]:
+    result = self.db.query(
+        Book.id, Book.title, func.count(Loan.id).label("loan_count")
+    ).join(Loan).group_by(Book.id).order_by(func.count(Loan.id).desc()).limit(limit).all()
+
+    return [{"id": book.id, "title": book.title, "loan_count": book.loan_count} for book in result]
+```
+
+#### 👥 Utilisateurs les plus actifs
+
+```python
+def get_most_active_users(self, limit: int = 10) -> List[Dict[str, Any]]:
+    ...
+```
+
+---
+
+## 📊 Routes API pour les statistiques
+
+### 📁 Fichier : `src/api/routes/stats.py`
+
+```python
+@router.get("/general", response_model=Dict[str, Any])
+def get_general_stats(...):
+    return StatsService(db).get_general_stats()
+```
+
+### 📁 Ajout au routeur principal : `src/api/routes/__init__.py`
+
+```python
+api_router.include_router(stats_router, prefix="/stats", tags=["stats"])
+```
+---
+
+## 🚀 Lancer les tests
+
+Utilisez `pytest` pour lancer les tests :
+
+```bash
+pytest
+```
+
+---
+
+## 📸 Est-ce que ça marche ?
+
+![alt text](image.png)
+
+Non, pas encore.
