@@ -1,13 +1,17 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
+from .users import User
+from .books import Book
 
 
 class LoanBase(BaseModel):
     user_id: int = Field(..., description="ID de l'utilisateur")
     book_id: int = Field(..., description="ID du livre")
-    return_date: Optional[datetime] = Field(None, description="Date de retour prévue")
-    returned: bool = Field(False, description="Indique si le livre a été retourné")
+    loan_date: datetime = Field(default_factory=datetime.utcnow, description="Date d'emprunt")
+    return_date: Optional[datetime] = Field(None, description="Date de retour")
+    due_date: datetime = Field(..., description="Date d'échéance")
+    extended: bool = Field(False, description="Indique si l'emprunt a été prolongé")
 
 
 class LoanCreate(LoanBase):
@@ -15,8 +19,9 @@ class LoanCreate(LoanBase):
 
 
 class LoanUpdate(BaseModel):
-    return_date: Optional[datetime] = Field(None, description="Nouvelle date de retour")
-    returned: Optional[bool] = Field(None, description="Statut de retour du livre")
+    return_date: Optional[datetime] = Field(None, description="Date de retour")
+    due_date: Optional[datetime] = Field(None, description="Date d'échéance")
+    extended: Optional[bool] = Field(None, description="Indique si l'emprunt a été prolongé")
 
 
 class LoanInDBBase(LoanBase):
@@ -25,8 +30,13 @@ class LoanInDBBase(LoanBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class Loan(LoanInDBBase):
     pass
+
+
+class LoanWithDetails(Loan):
+    user: User
+    book: Book
