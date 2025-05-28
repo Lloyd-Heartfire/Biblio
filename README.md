@@ -253,152 +253,120 @@ Exemples d’URL disponibles :
 - `/api/v1/auth/login`
 
 ___
-# 📚 Gestion de Bibliothèque – FastAPI TP3
+Voici une version **plus simple, plus pédagogique et mieux structurée** de ton `README.md`, avec plus de vocabulaire courant, des explications claires pour les débutants, et une meilleure introduction de chaque partie :
 
+---
 
+# 📚 Projet de Gestion de Bibliothèque avec FastAPI - TP3
 
-## 🔒 Exercice 7 : Mise à jour de la route d’authentification
+Ce projet est une application de gestion de bibliothèque universitaire basée sur **FastAPI**, structurée selon une architecture **N-Tiers**.
 
-### 📁 Fichier : `src/api/routes/auth.py`
+---
 
-Nous mettons en place un système d’authentification avec `OAuth2PasswordRequestForm`, en utilisant la couche métier `UserService`.
+## 🔐 Authentification (Connexion des utilisateurs)
 
-### 🧹 Code :
+📁 **Fichier : `src/api/routes/auth.py`**
+
+On utilise ici un formulaire de connexion (`OAuth2PasswordRequestForm`) pour permettre aux utilisateurs de **se connecter avec un email et un mot de passe**. Si l'utilisateur est reconnu et actif, on lui génère un **jeton d'accès (token)**.
+
+### Exemple de code :
 
 ```python
 @router.post("/login", response_model=Token)
-def login_access_token(
-    db: Session = Depends(get_db),
-    form_data: OAuth2PasswordRequestForm = Depends()
-):
-    repository = UserRepository(UserModel, db)
-    service = UserService(repository)
-
+def login_access_token(...):
+    ...
     user = service.authenticate(email=form_data.username, password=form_data.password)
+
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email ou mot de passe incorrect",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
 
     if not service.is_active(user=user):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Utilisateur inactif",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise HTTPException(status_code=401, detail="Utilisateur inactif")
 
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     return {
-        "access_token": create_access_token(
-            subject=user.id, expires_delta=access_token_expires
-        ),
+        "access_token": create_access_token(...),
         "token_type": "bearer",
     }
 ```
 
+Ce jeton permettra ensuite d’accéder aux routes protégées.
+
 ---
 
-## 🧪 Exercice 8 : Tests unitaires – Couche métier utilisateur
+## 🧪 Tests automatiques (avec `pytest`)
 
-### 📁 Fichier : `tests/conftest.py`
+### 📁 `tests/conftest.py`
 
-Mise en place d’une base SQLite en mémoire pour les tests automatisés :
+Ici, on prépare une **base de données en mémoire (SQLite)** spécialement pour les tests, sans affecter les vraies données.
 
 ```python
 @pytest.fixture(scope="session")
 def engine():
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
+    engine = create_engine("sqlite:///:memory:", ...)
     Base.metadata.create_all(engine)
     return engine
 ```
 
-Client de test FastAPI :
+On configure aussi un **client de test FastAPI** :
 
 ```python
 @pytest.fixture(scope="function")
 def client(db_session):
-    def override_get_db():
-        yield db_session
-
-    app.dependency_overrides[get_db] = override_get_db
-
-    from fastapi.testclient import TestClient
+    ...
     with TestClient(app) as client:
         yield client
-    app.dependency_overrides = {}
 ```
 
-### 📁 Fichier : `tests/services/test_users.py`
+### 📁 `tests/services/test_users.py`
 
-#### ✅ Exemple de test : création d’un utilisateur
+Quelques exemples de tests :
+
+#### ✅ Test de création d’un utilisateur
 
 ```python
-def test_create_user(db_session: Session):
-    repository = UserRepository(User, db_session)
-    service = UserService(repository)
-
-    user_in = UserCreate(
-        email="test@example.com",
-        password="password123",
-        full_name="Test User"
-    )
-
-    user = service.create(obj_in=user_in)
-
+def test_create_user(...):
+    ...
     assert user.email == "test@example.com"
-    assert hasattr(user, "hashed_password")
     assert user.hashed_password != "password123"
 ```
 
-#### 🔐 Exemple : authentification
+#### 🔐 Test de connexion
 
 ```python
-def test_authenticate_user(db_session: Session):
-    user_in = UserCreate(
-        email="auth@example.com",
-        password="password123",
-        full_name="Auth User"
-    )
-
-    user = service.create(obj_in=user_in)
-    authenticated_user = service.authenticate(email="auth@example.com", password="password123")
-
+def test_authenticate_user(...):
+    ...
     assert authenticated_user.id == user.id
 ```
 
-#### 🔄 Exemple : mise à jour
+#### ✏️ Test de mise à jour
 
 ```python
-def test_update_user(db_session: Session):
-    user = service.create(obj_in=UserCreate(...))
-    update = UserUpdate(full_name="New Name")
-
-    updated_user = service.update(db_obj=user, obj_in=update)
-
+def test_update_user(...):
+    ...
     assert updated_user.full_name == "New Name"
 ```
 
+Ces tests permettent de vérifier automatiquement que le code fait ce qu’on attend de lui.
+
 ---
 
-## 📊 Exercice 9 : Service de Statistiques
+## 📊 Statistiques (sur les livres et utilisateurs)
 
-### 📁 Fichier : `src/services/stats.py`
+📁 **Fichier : `src/services/stats.py`**
 
-Un service pour calculer des statistiques globales et détaillées sur les livres, utilisateurs et emprunts.
+Ce fichier contient un **service** qui calcule différentes statistiques sur la bibliothèque.
 
-#### 📈 Statistiques générales
+### Exemple de statistiques disponibles :
+
+#### 📈 Statistiques globales
+
+Nombre total de livres, nombre de titres différents, nombre d’utilisateurs, etc.
 
 ```python
-def get_general_stats(self) -> Dict[str, Any]:
+def get_general_stats(self):
     return {
-        "total_books": self.db.query(func.sum(Book.quantity)).scalar() or 0,
-        "unique_books": self.db.query(func.count(Book.id)).scalar() or 0,
+        "total_books": ...,
+        "unique_books": ...,
         ...
     }
 ```
@@ -406,43 +374,43 @@ def get_general_stats(self) -> Dict[str, Any]:
 #### 📚 Livres les plus empruntés
 
 ```python
-def get_most_borrowed_books(self, limit: int = 10) -> List[Dict[str, Any]]:
-    result = self.db.query(
-        Book.id, Book.title, func.count(Loan.id).label("loan_count")
-    ).join(Loan).group_by(Book.id).order_by(func.count(Loan.id).desc()).limit(limit).all()
-
-    return [{"id": book.id, "title": book.title, "loan_count": book.loan_count} for book in result]
+def get_most_borrowed_books(self, limit=10):
+    ...
+    return [{"id": ..., "title": ..., "loan_count": ...}, ...]
 ```
 
 #### 👥 Utilisateurs les plus actifs
 
 ```python
-def get_most_active_users(self, limit: int = 10) -> List[Dict[str, Any]]:
+def get_most_active_users(self, limit=10):
     ...
 ```
 
 ---
 
-## 📊 Routes API pour les statistiques
+## 🌐 Routes API pour les statistiques
 
-### 📁 Fichier : `src/api/routes/stats.py`
+📁 **Fichier : `src/api/routes/stats.py`**
+
+Exemple : afficher les statistiques générales :
 
 ```python
-@router.get("/general", response_model=Dict[str, Any])
+@router.get("/general")
 def get_general_stats(...):
     return StatsService(db).get_general_stats()
 ```
 
-### 📁 Ajout au routeur principal : `src/api/routes/__init__.py`
+📁 **Ajout dans le routeur principal** (`src/api/routes/__init__.py`) :
 
 ```python
 api_router.include_router(stats_router, prefix="/stats", tags=["stats"])
 ```
+
 ---
 
-## 🚀 Lancer les tests
+## 🧪 Lancer les tests
 
-Utilisez `pytest` pour lancer les tests :
+On peut lancer tous les tests avec cette commande dans le terminal :
 
 ```bash
 pytest
@@ -450,8 +418,8 @@ pytest
 
 ---
 
-## 📸 Est-ce que ça marche ?
+## 📸 Est-ce que l'application fonctionne ?
 
 ![alt text](image.png)
 
-Non, pas encore.
+Non.
