@@ -1,16 +1,15 @@
-from sqlalchemy import Column, Integer, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, Date, ForeignKey
 from sqlalchemy.orm import relationship
-from datetime import datetime
 
 from .base import Base
 
 
 class Loan(Base):
-    user_id = Column(Integer, ForeignKey("user.id"), nullable=False)
-    book_id = Column(Integer, ForeignKey("book.id"), nullable=False)
-    loan_date = Column(DateTime, default=datetime.utcnow, nullable=False)
-    return_date = Column(DateTime, nullable=True)
-    due_date = Column(DateTime, nullable=False)
+    user_id = Column(Integer, ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
+    book_id = Column(Integer, ForeignKey("book.id", ondelete="CASCADE"), nullable=False)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=True)
+    returned = Column(Date, nullable=True)
 
     # Relations
     user = relationship("User", back_populates="loans")

@@ -6,9 +6,8 @@ from datetime import datetime
 class LoanBase(BaseModel):
     user_id: int = Field(..., description="ID de l'utilisateur")
     book_id: int = Field(..., description="ID du livre")
-    loan_date: datetime = Field(default_factory=datetime.utcnow, description="Date d'emprunt")
-    return_date: Optional[datetime] = Field(None, description="Date de retour")
-    due_date: datetime = Field(..., description="Date d'échéance")
+    return_date: Optional[datetime] = Field(None, description="Date de retour prévue")
+    returned: bool = Field(False, description="Indique si le livre a été retourné")
 
 
 class LoanCreate(LoanBase):
@@ -16,8 +15,8 @@ class LoanCreate(LoanBase):
 
 
 class LoanUpdate(BaseModel):
-    return_date: Optional[datetime] = Field(None, description="Date de retour")
-    due_date: Optional[datetime] = Field(None, description="Date d'échéance")
+    return_date: Optional[datetime] = Field(None, description="Nouvelle date de retour")
+    returned: Optional[bool] = Field(None, description="Statut de retour du livre")
 
 
 class LoanInDBBase(LoanBase):
@@ -26,7 +25,7 @@ class LoanInDBBase(LoanBase):
     updated_at: datetime
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 class Loan(LoanInDBBase):
